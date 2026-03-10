@@ -28,13 +28,17 @@ def fetch_prizepicks_props() -> List[PlayerProp]:
     pp_url = "https://api.prizepicks.com/projections"
     scrapingant_key = os.environ.get('SCRAPINGANT_API_KEY')
     if scrapingant_key:
-        # Route through ScrapingAnt residential proxy to bypass datacenter IP block
-        # browser=true renders JS which bypasses PerimeterX bot detection
-        resp = requests.get(
-            'https://api.scrapingant.com/v2/general',
-            params={'url': pp_url, 'x-api-key': scrapingant_key, 'browser': 'false', 'return_page_source': 'true'},
-            timeout=60
-        )
+        # Retry up to 3 times — ScrapingAnt occasionally returns 423 on first attempt
+        resp = None
+        for attempt in range(3):
+            resp = requests.get(
+                'https://api.scrapingant.com/v2/general',
+                params={'url': pp_url, 'x-api-key': scrapingant_key, 'browser': 'false', 'return_page_source': 'true'},
+                timeout=60
+            )
+            if resp.status_code == 200:
+                break
+            print(f"ScrapingAnt attempt {attempt+1} returned {resp.status_code}, retrying...", flush=True)
     else:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36',

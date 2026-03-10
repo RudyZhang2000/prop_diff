@@ -101,7 +101,7 @@
         function startRefresh() {
             const btn = document.getElementById('refreshBtn');
             btn.disabled = true;
-            setStatus('<span class="spinner"></span>Opening browser for PrizePicks...');
+            setStatus('<span class="spinner"></span>Starting refresh...');
             fetch('/refresh', { method: 'POST' })
                 .then(r => r.json())
                 .then(data => {
