@@ -27,6 +27,7 @@ class PlayerProp:
 def fetch_prizepicks_props() -> List[PlayerProp]:
     pp_url = "https://api.prizepicks.com/projections"
     scrapingant_key = os.environ.get('SCRAPINGANT_API_KEY')
+    print(f"ScrapingAnt key present: {bool(scrapingant_key)}", flush=True)
     if scrapingant_key:
         # Route through ScrapingAnt residential proxy to bypass datacenter IP block
         # browser=true renders JS which bypasses PerimeterX bot detection
