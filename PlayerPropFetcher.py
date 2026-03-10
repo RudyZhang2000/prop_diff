@@ -31,7 +31,7 @@ def fetch_prizepicks_props() -> List[PlayerProp]:
     }
     resp = requests.get(url, headers=headers, timeout=15)
     if resp.status_code != 200:
-        print(f"PrizePicks returned {resp.status_code}")
+        print(f"PrizePicks returned {resp.status_code}: {resp.text[:200]}", flush=True)
         return []
     try:
         data = resp.json()
