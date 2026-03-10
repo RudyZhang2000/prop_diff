@@ -2,6 +2,7 @@
 import requests
 from typing import List, Dict
 import json
+import os
 
 class PlayerProp:
     def __init__(self, player: str, sport: str, prop_type: str, line: float, source: str,
@@ -24,12 +25,21 @@ class PlayerProp:
         }
 
 def fetch_prizepicks_props() -> List[PlayerProp]:
-    url = "https://api.prizepicks.com/projections"
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
-    }
-    resp = requests.get(url, headers=headers, timeout=15)
+    pp_url = "https://api.prizepicks.com/projections"
+    scrapingant_key = os.environ.get('SCRAPINGANT_API_KEY')
+    if scrapingant_key:
+        # Route through ScrapingAnt residential proxy to bypass datacenter IP block
+        resp = requests.get(
+            'https://api.scrapingant.com/v2/general',
+            params={'url': pp_url, 'x-api-key': scrapingant_key, 'browser': 'false'},
+            timeout=30
+        )
+    else:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36',
+            'Accept': 'application/json',
+        }
+        resp = requests.get(pp_url, headers=headers, timeout=15)
     if resp.status_code != 200:
         print(f"PrizePicks returned {resp.status_code}: {resp.text[:200]}", flush=True)
         return []
