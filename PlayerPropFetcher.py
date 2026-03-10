@@ -29,10 +29,11 @@ def fetch_prizepicks_props() -> List[PlayerProp]:
     scrapingant_key = os.environ.get('SCRAPINGANT_API_KEY')
     if scrapingant_key:
         # Route through ScrapingAnt residential proxy to bypass datacenter IP block
+        # browser=true renders JS which bypasses PerimeterX bot detection
         resp = requests.get(
             'https://api.scrapingant.com/v2/general',
-            params={'url': pp_url, 'x-api-key': scrapingant_key, 'browser': 'false'},
-            timeout=30
+            params={'url': pp_url, 'x-api-key': scrapingant_key, 'browser': 'false', 'return_page_source': 'true'},
+            timeout=60
         )
     else:
         headers = {
