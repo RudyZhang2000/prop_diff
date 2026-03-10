@@ -24,10 +24,8 @@ def run_refresh():
     _status_message = 'Fetching PrizePicks...'
     try:
         pp_props = fetch_prizepicks_props()
-        print(f"PrizePicks: {len(pp_props)} props", flush=True)
         _status_message = 'Fetching Underdog...'
         ud_props = fetch_underdog_props()
-        print(f"Underdog: {len(ud_props)} props", flush=True)
         _status_message = 'Comparing...'
         diffs = compare_props(pp_props, ud_props)
         for d in diffs:
@@ -37,7 +35,7 @@ def run_refresh():
         diffs.sort(key=_sort_key)
         _diffs = diffs
         _status = 'done'
-        _status_message = f'{len(diffs)} props found (PP: {len(pp_props)}, UD: {len(ud_props)})'
+        _status_message = f'{len(diffs)} props found'
     except Exception as e:
         _status = 'error'
         _status_message = str(e)
