@@ -6,7 +6,7 @@ import os
 
 class PlayerProp:
     def __init__(self, player: str, sport: str, prop_type: str, line: float, source: str,
-                 higher_mult: float = 1.0, lower_mult: float = 1.0):
+                 higher_mult: float = None, lower_mult: float = None):
         self.player = player
         self.sport = sport
         self.prop_type = prop_type
@@ -131,8 +131,8 @@ def fetch_underdog_props() -> List[PlayerProp]:
             key = (player_name, sport_id, stat_name)
             if key not in seen:
                 seen.add(key)
-                higher_mult = 1.0
-                lower_mult = 1.0
+                higher_mult = None
+                lower_mult = None
                 for opt in line.get('options', []):
                     choice = opt.get('choice', '')
                     mult = float(opt.get('payout_multiplier', 1.0))
