@@ -3,10 +3,11 @@ import requests
 from typing import List, Dict
 import json
 import os
+from datetime import datetime, timezone
 
 class PlayerProp:
     def __init__(self, player: str, sport: str, prop_type: str, line: float, source: str,
-                 higher_mult: float = None, lower_mult: float = None):
+                 higher_mult: float = None, lower_mult: float = None, game_time: datetime = None):
         self.player = player
         self.sport = sport
         self.prop_type = prop_type
@@ -14,6 +15,7 @@ class PlayerProp:
         self.source = source
         self.higher_mult = higher_mult
         self.lower_mult = lower_mult
+        self.game_time = game_time  # UTC-aware datetime
 
     def to_dict(self) -> Dict:
         return {
@@ -75,7 +77,14 @@ def fetch_prizepicks_props() -> List[PlayerProp]:
         stat_type = item.get('attributes', {}).get('stat_type', '')
         line = item.get('attributes', {}).get('line_score', None)
         if stat_type and line is not None:
-            props.append(PlayerProp(player, sport, stat_type, line, 'PrizePicks'))
+            raw_time = item.get('attributes', {}).get('start_time')
+            game_time = None
+            if raw_time:
+                try:
+                    game_time = datetime.fromisoformat(raw_time).astimezone(timezone.utc)
+                except Exception:
+                    pass
+            props.append(PlayerProp(player, sport, stat_type, line, 'PrizePicks', game_time=game_time))
     return props
 
 def fetch_underdog_props() -> List[PlayerProp]:
@@ -104,10 +113,23 @@ def fetch_underdog_props() -> List[PlayerProp]:
         full_name = f"{first} {last}".strip() if first else last.strip()
         player_lookup[pid] = {'name': full_name, 'sport_id': player.get('sport_id', '')}
 
-    # Build appearance lookup: appearance_id -> player_id
+    # Build game time lookup: match_id -> UTC datetime
+    game_time_lookup = {}
+    for game in data.get('games', []):
+        raw = game.get('scheduled_at')
+        if raw:
+            try:
+                game_time_lookup[game['id']] = datetime.fromisoformat(raw.replace('Z', '+00:00')).astimezone(timezone.utc)
+            except Exception:
+                pass
+
+    # Build appearance lookup: appearance_id -> {player_id, match_id}
     appearance_lookup = {}
     for appearance in data.get('appearances', []):
-        appearance_lookup[appearance.get('id', '')] = appearance.get('player_id', '')
+        appearance_lookup[appearance.get('id', '')] = {
+            'player_id': appearance.get('player_id', ''),
+            'match_id': appearance.get('match_id'),
+        }
 
     props = []
     seen = set()
@@ -123,12 +145,14 @@ def fetch_underdog_props() -> List[PlayerProp]:
         appearance_stat = over_under.get('appearance_stat', {})
         appearance_id = appearance_stat.get('appearance_id', '')
         stat_name = appearance_stat.get('display_stat', '')
-        player_id = appearance_lookup.get(appearance_id, '')
+        appearance_data = appearance_lookup.get(appearance_id, {})
+        player_id = appearance_data.get('player_id', '')
+        match_id = appearance_data.get('match_id')
         player_info = player_lookup.get(player_id, {})
         player_name = player_info.get('name', '')
         sport_id = player_info.get('sport_id', '')
         if player_name and stat_name:
-            key = (player_name, sport_id, stat_name)
+            key = (player_name, sport_id, stat_name, match_id)
             if key not in seen:
                 seen.add(key)
                 higher_mult = None
@@ -140,7 +164,8 @@ def fetch_underdog_props() -> List[PlayerProp]:
                         higher_mult = mult
                     elif choice == 'lower':
                         lower_mult = mult
+                game_time = game_time_lookup.get(match_id)
                 props.append(PlayerProp(player_name, sport_id, stat_name, float(stat_value), 'Underdog',
-                                        higher_mult=higher_mult, lower_mult=lower_mult))
+                                        higher_mult=higher_mult, lower_mult=lower_mult, game_time=game_time))
 
     return props

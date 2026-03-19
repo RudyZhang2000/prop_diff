@@ -68,6 +68,13 @@ _SPORT_MAP = {
 def normalize_sport(sport: str) -> str:
     return _SPORT_MAP.get(sport, sport)
 
+
+def _game_times_match(t1, t2):
+    """True if either time is unknown, or both are within 2 hours of each other."""
+    if t1 is None or t2 is None:
+        return True
+    return abs((t1 - t2).total_seconds()) <= 7200
+
 def normalize_player(player: str) -> str:
     # Strip accents (e.g. Jokić → Jokic)
     nfkd = unicodedata.normalize('NFKD', player)
@@ -76,17 +83,27 @@ def normalize_player(player: str) -> str:
     return ascii_str.lower().strip().replace('-', ' ')
 
 def compare_props(prizepicks_props, underdog_props):
-    # Index by (normalized_player, normalized_sport, normalized_prop_type)
-    pp_dict = {(normalize_player(p.player), normalize_sport(p.sport), normalize_prop_type(p.prop_type)): p for p in prizepicks_props}
-    ud_dict = {(normalize_player(p.player), normalize_sport(p.sport), normalize_prop_type(p.prop_type)): p for p in underdog_props}
-    all_keys = set(pp_dict.keys()) | set(ud_dict.keys())
+    # Group by (normalized_player, normalized_sport, normalized_prop_type)
+    pp_groups = defaultdict(list)
+    ud_groups = defaultdict(list)
+    for p in prizepicks_props:
+        pp_groups[(normalize_player(p.player), normalize_sport(p.sport), normalize_prop_type(p.prop_type))].append(p)
+    for p in underdog_props:
+        ud_groups[(normalize_player(p.player), normalize_sport(p.sport), normalize_prop_type(p.prop_type))].append(p)
+    all_keys = set(pp_groups.keys()) | set(ud_groups.keys())
     diffs = []
     for key in all_keys:
-        pp = pp_dict.get(key)
-        ud = ud_dict.get(key)
-        display_prop_type = pp.prop_type if pp else ud.prop_type
-        if pp and ud:
-            if pp.line != ud.line:
+        pp_list = pp_groups.get(key, [])
+        ud_list = ud_groups.get(key, [])
+        if not pp_list or not ud_list:
+            continue
+        # Pair each PP prop with each UD prop that is for the same game (within 2 hours)
+        for pp in pp_list:
+            for ud in ud_list:
+                if not _game_times_match(pp.game_time, ud.game_time):
+                    continue
+                if pp.line == ud.line:
+                    continue
                 # Which direction would you bet on UD?
                 # PP < UD → take lower on UD; PP > UD → take higher on UD
                 relevant_mult = ud.lower_mult if pp.line < ud.line else ud.higher_mult
@@ -96,7 +113,7 @@ def compare_props(prizepicks_props, underdog_props):
                 diffs.append({
                     'player': key[0].title(),
                     'sport': key[1],
-                    'prop_type': display_prop_type,
+                    'prop_type': pp.prop_type,
                     'prizepicks_line': pp.line,
                     'underdog_line': ud.line,
                     'ud_relevant_mult': round(relevant_mult, 3)
